@@ -134,9 +134,7 @@ def train():
 
 	yawn_criterion = nn.BCEWithLogitsLoss()
 	yawn_optimizer = optim.Adam(yawn_network.parameters(), lr=0.001)
-	yawn_scheduler = optim.lr_scheduler.ReduceLROnPlateau(yawn_optimizer, mode='max',
-																	 factor=0.5, patience=1, threshold=0.0001, threshold_mode='abs',
-																	 cooldown=0, min_lr=1e-6, eps=1e-08, verbose=True)
+	yawn_scheduler = optim.lr_scheduler.ReduceLROnPlateau(yawn_optimizer, mode='max', factor=0.5, patience=1, threshold=0.0001, threshold_mode='abs', cooldown=0, min_lr=1e-6, eps=1e-08, verbose=True)
 
 	yawn_num_epochs = 10
 	train_network(yawn_network, yawn_train_loader, yawn_valid_loader, yawn_optimizer, yawn_criterion, yawn_scheduler, yawn_num_epochs, 'pretrained/yawn.pt')

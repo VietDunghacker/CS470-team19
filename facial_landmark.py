@@ -262,9 +262,7 @@ def train():
 
 	facial_landmark_criterion = nn.MSELoss()
 	facial_landmark_optimizer = optim.Adam(facial_landmark_network.parameters(), lr=0.001)
-	facial_landmark_scheduler = optim.lr_scheduler.ReduceLROnPlateau(facial_landmark_optimizer, mode='min',
-																	 factor=0.5, patience=3, threshold=0.0001, threshold_mode='rel',
-																	 cooldown=0, min_lr=1e-6, eps=1e-08, verbose=True)
+	facial_landmark_scheduler = optim.lr_scheduler.ReduceLROnPlateau(facial_landmark_optimizer, mode='min', factor=0.5, patience=3, threshold=0.0001, threshold_mode='rel', cooldown=0, min_lr=1e-6, eps=1e-08, verbose=True)
 
 	facial_landmark_num_epochs = 50
 

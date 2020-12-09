@@ -108,9 +108,7 @@ def train():
 
 	eye_criterion = nn.BCEWithLogitsLoss()
 	eye_optimizer = optim.Adam(eye_network.parameters(), lr=0.001)
-	eye_scheduler = optim.lr_scheduler.ReduceLROnPlateau(eye_optimizer, mode='max',
-																	 factor=0.5, patience=1, threshold=0.0001, threshold_mode='abs',
-																	 cooldown=0, min_lr=1e-6, eps=1e-08, verbose=True)
+	eye_scheduler = optim.lr_scheduler.ReduceLROnPlateau(eye_optimizer, mode='max', factor=0.5, patience=1, threshold=0.0001, threshold_mode='abs', cooldown=0, min_lr=1e-6, eps=1e-08, verbose=True)
 
 	eye_num_epochs = 10
 
