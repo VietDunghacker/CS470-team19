@@ -4,6 +4,7 @@ import os
 import random
 import math
 import sys
+import urllib.request
 import numpy as np
 import matplotlib.pyplot as plt
 import xml.etree.ElementTree as ET 
@@ -25,12 +26,17 @@ from torchvision import datasets, models, transforms
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
-!pip install efficientnet_pytorch
-from efficientnet_pytorch import EfficientNet
+try:
+	from efficientnet_pytorch import EfficientNet
+except:
+	os.system('pip install efficientnet_pytorch')
+	from efficientnet_pytorch import EfficientNet
 
-from .facial_landmark import detect_facial_landmark
-from .model import Network
-from .util import print_overwrite, train_network
+from facial_landmark import detect_facial_landmark
+from model import Network
+from util import print_overwrite, train_network
+
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 eye_transform = transforms.Compose([
 	transforms.Resize(96, interpolation = Image.LANCZOS),
@@ -38,21 +44,22 @@ eye_transform = transforms.Compose([
 	transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 	])
 
+#Download dataset for Closed Eye Detection
 def download_data():
-	if not os.path.exists('/data/mrlEyes_2018_01'):
-		urllib.request.urlretrieve('http://mrl.cs.vsb.cz/data/eyedataset/mrlEyes_2018_01.zip', '/data/mrlEyes_2018_01.zip')
-	    with ZipFile('/data/mrlEyes_2018_01.zip', 'r') as zip_ref:
-	        zip_ref.extractall('/data/')
-	    os.remove('/data/mrlEyes_2018_01.zip')
+	if not os.path.exists('./data/mrlEyes_2018_01'):
+		urllib.request.urlretrieve('http://mrl.cs.vsb.cz/data/eyedataset/mrlEyes_2018_01.zip', './data/mrlEyes_2018_01.zip')
+		with ZipFile('./data/mrlEyes_2018_01.zip', 'r') as zip_ref:
+			zip_ref.extractall('./data/')
+		os.remove('./data/mrlEyes_2018_01.zip')
 
-
+#Dataset for Closed Eye Detection
 class EyeDataset(Dataset):
 
 	def __init__(self, transform=None):
 		self.image_filenames = []
 		self.label = []
 		self.transform = transform
-		self.root_dir = '/data/mrlEyes_2018_01'
+		self.root_dir = './data/mrlEyes_2018_01'
 		
 		for folder in os.listdir(self.root_dir):
 			if folder == 'annotation.txt' or folder == 'stats_2018_01.ods':
@@ -77,7 +84,12 @@ class EyeDataset(Dataset):
 
 		return image, label
 
+#Load pretrained model for Closed Eye Detection
+def load_pretrained_eye(network):
+    network.load_state_dict(torch.load(',/pretrained/eye.pt', device))
+    return network
 
+#Train model for Closed Eye Detection
 def train():
 	download_data()
 	eye_dataset = EyeDataset(eye_transform)
@@ -92,7 +104,7 @@ def train():
 
 	torch.autograd.set_detect_anomaly(True)
 	eye_network = Network(1)
-	eye_network.cuda()
+	eye_network.to(device)
 
 	eye_criterion = nn.BCEWithLogitsLoss()
 	eye_optimizer = optim.Adam(eye_network.parameters(), lr=0.001)
@@ -102,7 +114,7 @@ def train():
 
 	eye_num_epochs = 10
 
-	train_yawn(eye_network, eye_train_loader, eye_valid_loader, eye_optimizer, eye_criterion, eye_scheduler, eye_num_epochs, 'pretrained/eye.pt')
+	train_network(eye_network, eye_train_loader, eye_valid_loader, eye_optimizer, eye_criterion, eye_scheduler, eye_num_epochs, './pretrained/eye.pt')
 
 #test eye close detector
 def test_eye_close_detector(image_path):
@@ -118,3 +130,6 @@ def test_eye_close_detector(image_path):
 		prediction = 1 if prediction >= 0.5 else 0
 		
 		return prediction
+
+if __name__ == "__main__":
+	train()

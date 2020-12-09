@@ -26,31 +26,42 @@ from torchvision import datasets, models, transforms
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
-!pip install efficientnet_pytorch
-from efficientnet_pytorch import EfficientNet
+try:
+	from efficientnet_pytorch import EfficientNet
+except:
+	os.system('pip install efficientnet_pytorch')
+	from efficientnet_pytorch import EfficientNet
 
-!pip install facenet-pytorch
-from facenet_pytorch import MTCNN
+try:
+	from facenet_pytorch import MTCNN
+except:
+	os.system('pip install facenet-pytorch')
+	from facenet_pytorch import MTCNN
 
-from .model import Network
-from .util import print_overwrite
+from model import Network
+from util import print_overwrite, pad_image
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+#loading MTCNN
 mtcnn = MTCNN(image_size = 224, margin = 24)
 
 best_network = None
 
+#Download dataset for Facial Landmark Detection
 def download_data():
-	if not os.path.exists('/data/ibug_300W_large_face_landmark_dataset'):
-		urllib.request.urlretrieve('http://dlib.net/files/data/ibug_300W_large_face_landmark_dataset.tar.gz',  '/data/ibug_300W_large_face_landmark_dataset.tar.gz')
-		with tarfile.open('/data/ibug_300W_large_face_landmark_dataset.tar.gz', "r:gz") as tar:
-			tar.extractall('/data/ibug_300W_large_face_landmark_dataset/')
-		os.remove('/data/ibug_300W_large_face_landmark_dataset.tar.gz')
+	if not os.path.exists('./data/ibug_300W_large_face_landmark_dataset'):
+		urllib.request.urlretrieve('http://dlib.net/files/data/ibug_300W_large_face_landmark_dataset.tar.gz',  './data/ibug_300W_large_face_landmark_dataset.tar.gz')
+		with tarfile.open('./data/ibug_300W_large_face_landmark_dataset.tar.gz', "r:gz") as tar:
+			tar.extractall('./data/')
+		os.remove('./data/ibug_300W_large_face_landmark_dataset.tar.gz')
 
-#transform for facial landmark dataset only
+#transform for Facial Landmark dataset only
 class Transforms():
 	def __init__(self):
 		pass
 	
+	#rotate image
 	def rotate(self, image, landmarks, angle):
 		angle = random.uniform(-angle, +angle)
 
@@ -66,10 +77,12 @@ class Transforms():
 		new_landmarks = new_landmarks + 0.5
 		return Image.fromarray(image), new_landmarks
 
+	#resize image
 	def resize(self, image, landmarks, img_size):
 		image = TF.resize(image, img_size)
 		return image, landmarks
 
+	#color jitter image
 	def color_jitter(self, image, landmarks):
 		color_jitter = transforms.ColorJitter(brightness=0.3, 
 											  contrast=0.3,
@@ -78,6 +91,7 @@ class Transforms():
 		image = color_jitter(image)
 		return image, landmarks
 
+	#crop face from the image using given data
 	def crop_face(self, image, landmarks, crops):
 		left = int(crops['left'])
 		top = int(crops['top'])
@@ -102,19 +116,19 @@ class Transforms():
 		image = TF.normalize(image, [0.5], [0.5])
 		return image, landmarks
 
-#Dataset for Facial Landmark
+#Dataset for Facial Landmark Detection
 class FaceLandmarksDataset(Dataset):
 
 	def __init__(self, transform=None):
 
-		tree = ET.parse('/data/ibug_300W_large_face_landmark_dataset/labels_ibug_300W_train.xml')
+		tree = ET.parse('./data/ibug_300W_large_face_landmark_dataset/labels_ibug_300W_train.xml')
 		root = tree.getroot()
 
 		self.image_filenames = []
 		self.landmarks = []
 		self.crops = []
 		self.transform = transform
-		self.root_dir = '/data/ibug_300W_large_face_landmark_dataset/'
+		self.root_dir = './data/ibug_300W_large_face_landmark_dataset/'
 		
 		for filename in root[2]:
 			self.image_filenames.append(os.path.join(self.root_dir, filename.attrib['file']))
@@ -146,8 +160,9 @@ class FaceLandmarksDataset(Dataset):
 
 		return image, landmarks
 
+#Load pretrained model for Facial Landmark Detection
 def load_pretrained_facial_landmark(network):
-	network.load_state_dict(torch.load('/pretrained/landmarks.pt'))
+	network.load_state_dict(torch.load('./pretrained/facial_landmarks.pt', device))
 	return network
 
 def train_facial_landmark(network, train_loader, valid_loader, optimizer, criterion, scheduler, num_epochs, data_dir, loss_min = np.inf):
@@ -159,8 +174,8 @@ def train_facial_landmark(network, train_loader, valid_loader, optimizer, criter
 		
 		network.train()
 		for step, (images, landmarks) in enumerate(train_loader):
-			images = images.cuda()
-			landmarks = landmarks.view(landmarks.size(0),-1).cuda() 
+			images = images.to(device)
+			landmarks = landmarks.view(landmarks.size(0),-1).to(device)
 			
 			predictions = network(images)
 			
@@ -204,8 +219,8 @@ def validate_facial_landmark(network, valid_loader, criterion, epoch):
 		
 		for step, (images, landmarks) in enumerate(valid_loader):
 					
-			images = images.cuda()
-			landmarks = landmarks.view(landmarks.size(0),-1).cuda()
+			images = images.to(device)
+			landmarks = landmarks.view(landmarks.size(0),-1).to(device)
 		
 			predictions = network(images)
 
@@ -227,16 +242,13 @@ def validate_facial_landmark(network, valid_loader, criterion, epoch):
 
 	return loss_valid
 
-
+#Train model for Facial Landmark Detection
 def train():
 	download_data()
 	facial_landmark_dataset = FaceLandmarksDataset(Transforms())
 	# split the dataset into validation and test sets
 	len_valid_set = int(0.1*len(facial_landmark_dataset))
 	len_train_set = len(facial_landmark_dataset) - len_valid_set
-
-	print("The length of Train set is {}".format(len_train_set))
-	print("The length of Valid set is {}".format(len_valid_set))
 
 	facial_landmark_train_dataset , facial_landmark_valid_dataset,  = torch.utils.data.random_split(facial_landmark_dataset , [len_train_set, len_valid_set])
 
@@ -246,7 +258,7 @@ def train():
 
 	torch.autograd.set_detect_anomaly(True)
 	facial_landmark_network = Network(136)
-	facial_landmark_network.cuda()	
+	facial_landmark_network.to(device)
 
 	facial_landmark_criterion = nn.MSELoss()
 	facial_landmark_optimizer = optim.Adam(facial_landmark_network.parameters(), lr=0.001)
@@ -257,17 +269,16 @@ def train():
 	facial_landmark_num_epochs = 50
 
 
-	train_facial_landmark(facial_landmark_network, facial_landmark_train_loader, facial_landmark_valid_loader, facial_landmark_optimizer, facial_landmark_criterion, facial_landmark_scheduler, facial_landmark_num_epochs, '/pretrained/facial_landmarks.pt')
+	train_facial_landmark(facial_landmark_network, facial_landmark_train_loader, facial_landmark_valid_loader, facial_landmark_optimizer, facial_landmark_criterion, facial_landmark_scheduler, facial_landmark_num_epochs, './pretrained/facial_landmarks.pt')
 
-#Test facial landmark detection
-#argument image_path: path to image
-def detect_facial_landmark(image_path):
-	image = Image.open(image_path)
-
+#Test Facial Landmark Detection
+#argument image: image
+def detect_facial_landmark(image):
 	box = tuple(mtcnn.detect(image)[0][0].tolist())
 	image = image.crop(box)
 	image = pad_image(image)
 	image = image.resize((224,224))
+	image_copy = image.copy()
 
 	with torch.no_grad():
 		image = transforms.ToTensor()(image)
@@ -281,4 +292,7 @@ def detect_facial_landmark(image_path):
 		image = image.to(device)
 		prediction = (best_network(image.unsqueeze(0)).cpu() + 0.5) * 224
 		prediction = prediction.view(68, 2)
-	return prediction
+	return image_copy, prediction.numpy()
+
+if __name__ == "__main__":
+	train()

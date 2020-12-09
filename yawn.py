@@ -26,15 +26,17 @@ from torchvision import datasets, models, transforms
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
-!pip install efficientnet_pytorch
-from efficientnet_pytorch import EfficientNet
+try:
+	from efficientnet_pytorch import EfficientNet
+except:
+	os.system('pip install efficientnet_pytorch')
+	from efficientnet_pytorch import EfficientNet
 
-!pip install facenet-pytorch
-from facenet_pytorch import MTCNN
+from facial_landmark import detect_facial_landmark
+from model import Network
+from util import print_overwrite, train_network
 
-from .facial_landmark import detect_facial_landmark
-from .model import Network
-from .util import print_overwrite, train_network
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 yawn_data_train_transform = transforms.Compose([
 	transforms.Resize((96,96), interpolation = Image.LANCZOS),
@@ -50,13 +52,15 @@ yawn_data_test_transform = transforms.Compose([
 	transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 	])
 
+#Data for Yawn Detection is already downloaded to /data/dataset_new
+#Dataset for Yawn Detection
 class YawnDataset(Dataset):
 
 	def __init__(self, mode ,transform=None):
 		self.image_filenames = []
 		self.label = []
 		self.transform = transform
-		self.root_dir = '/data/dataset_new'
+		self.root_dir = './data/dataset_new'
 		
 		for filename in os.listdir(os.path.join(self.root_dir, mode, 'no_yawn')):
 			self.image_filenames.append(os.path.join(self.root_dir, mode, 'no_yawn', filename))
@@ -79,6 +83,7 @@ class YawnDataset(Dataset):
 
 		return image, label
 
+#Transformation for Yawn Detection only
 class YawnTransforms():
 	def __init__(self, transforms):
 		self.transforms = transforms
@@ -93,7 +98,7 @@ class YawnTransforms():
 		return image
 
 	def crop_mouth(self, image):
-		landmarks = detect_facial_landmark(image)
+		image, landmarks = detect_facial_landmark(image)
 		mouth = landmarks[49 : ]
 		x = min(mouth[:,0])
 		z = max(mouth[:,0])
@@ -111,10 +116,12 @@ class YawnTransforms():
 		image = self.transforms(image)
 		return image
 
+#Load pretrained model for Yawn Detection
 def load_pretrained_yawn(network):
-	network.load_state_dict(torch.load('/pretrained/yawn.pt'))
+	network.load_state_dict(torch.load('./pretrained/yawn.pt', device))
 	return network
 
+#Train model for Yawn Detection
 def train():
 	yawn_dataset_train = YawnDataset('train', YawnTransforms(yawn_data_train_transform))
 	yawn_dataset_test = YawnDataset('test', YawnTransforms(yawn_data_test_transform))
@@ -123,7 +130,7 @@ def train():
 
 	torch.autograd.set_detect_anomaly(True)
 	yawn_network = Network(1)
-	yawn_network.cuda()	
+	yawn_network.to(device)
 
 	yawn_criterion = nn.BCEWithLogitsLoss()
 	yawn_optimizer = optim.Adam(yawn_network.parameters(), lr=0.001)
@@ -148,3 +155,6 @@ def test_yawn_detector(image_path):
 		prediction = 1 if prediction >= 0.5 else 0
 		
 		return prediction
+
+if __name__ == "__main__":
+	train()

@@ -31,18 +31,25 @@ from torchvision import datasets, models, transforms
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
-!pip install efficientnet_pytorch
-from efficientnet_pytorch import EfficientNet
+try:
+	from efficientnet_pytorch import EfficientNet
+except:
+	os.system('pip install efficientnet_pytorch')
+	from efficientnet_pytorch import EfficientNet
 
-!pip install facenet-pytorch
-from facenet_pytorch import MTCNN
+try:
+	from facenet_pytorch import MTCNN
+except:
+	os.system('pip install facenet-pytorch')
+	from facenet_pytorch import MTCNN
+	
 mtcnn = MTCNN(image_size = 224, margin = 24)
 
-from .model import Network
-from .facial_landmark import load_pretrained_facial_landmark
-from .yawn import load_pretrained_yawn
-from .eye import load_pretrained_eye
-from .util import pad_image_cv2
+from model import Network
+from facial_landmark import load_pretrained_facial_landmark
+from yawn import load_pretrained_yawn
+from eye import load_pretrained_eye
+from util import pad_image_cv2
 
 facial_landmark_network = Network(136)
 eye_network = Network(1)

@@ -26,6 +26,8 @@ from torchvision import datasets, models, transforms
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 def print_overwrite(step, total_step, loss, operation):
 	sys.stdout.write('\r')
 	if operation == 'train':
@@ -55,8 +57,8 @@ def train_network(network, train_loader, valid_loader, optimizer, criterion, sch
 		
 		network.train()
 		for step, (images, labels) in enumerate(train_loader):
-			images = images.cuda()
-			labels = labels.float().cuda() 
+			images = images.to(device)
+			labels = labels.float().to(device) 
 			
 			predictions = network(images).squeeze()
 			
@@ -111,8 +113,8 @@ def validate_network(network, valid_loader, criterion, epoch):
 		
 		for step, (images, labels) in enumerate(valid_loader):
 					
-			images = images.cuda()
-			labels = labels.float().cuda()
+			images = images.to(device)
+			labels = labels.float().to(device)
 		
 			predictions = network(images).squeeze()
 

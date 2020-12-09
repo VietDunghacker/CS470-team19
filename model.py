@@ -1,12 +1,10 @@
 import torch.nn as nn
 
-!pip install efficientnet_pytorch
-from efficientnet_pytorch import EfficientNet
-
-random.seed(69)
-np.random.seed(69)
-torch.manual_seed(69)
-torch.cuda.manual_seed(69)
+try:
+    from efficientnet_pytorch import EfficientNet
+except:
+    os.system('pip install efficientnet_pytorch')
+    from efficientnet_pytorch import EfficientNet
 
 class Network(nn.Module):
   def __init__(self, num_classes):
