@@ -1,3 +1,4 @@
+import argparse
 import time
 import cv2
 import os
@@ -139,7 +140,7 @@ def eye_close_detector(image, network):
 		return torch.sigmoid(prediction).item()
 
 #Test the model on a video stream
-#If streaming, 
+#Input video_path: path to video
 def test(video_path):
 	vs = FileVideoStream(video_path).start()
 	time.sleep(1.0)
@@ -241,10 +242,17 @@ def test(video_path):
 		if writer is None:
 			# Get the space size (width and height) of the frame, and instantiate the video stream writer
 			(height, width) = frame.shape[:2]
-			writer = cv2.VideoWriter('output.avi', fourcc, 20, (width, height), True)
+			writer = cv2.VideoWriter('./output.avi', fourcc, 20, (width, height), True)
 
 		# Write frame to video
 		writer.write(frame)
 
 	vs.stop()
 	writer.release()
+
+if __name__ == "__main__":
+	parser = argparse.ArgumentParser()
+	parser.add_argument('path', help='the path to video')
+
+	args = parser.parse_args()
+	test(args.path)
